@@ -3,17 +3,7 @@ import streamlit as st
 
 class EnginexBackend:
     def __init__(self):
-        # Default Data jika belum ada
-        self.default_info = {
-            "name": "PEMBANGUNAN RUKO 2 LANTAI",
-            "loc": "DENPASAR - BALI",
-            "year": "2026",
-            "owner": "BAPAK RIO",
-            "cont": "SMART STUDIO",
-            "fee_pct": 10.0,
-            "tax_pct": 11.0
-        }
-        
+        # Data Default (Jika belum ada)
         self.default_boq = [
             {"Divisi": "I. PERSIAPAN", "Uraian": "Pengukuran & Bouwplank", "Satuan": "m2", "Volume": 425.18, "HargaSatuan": 15000},
             {"Divisi": "I. PERSIAPAN", "Uraian": "Direksi Keet & Gudang", "Satuan": "Ls", "Volume": 1.0, "HargaSatuan": 15000000},
@@ -24,45 +14,47 @@ class EnginexBackend:
             {"Divisi": "IV. LANTAI 2", "Uraian": "Beton Balok Lt 2", "Satuan": "m3", "Volume": 21.28, "HargaSatuan": 4800000},
         ]
         
-        self.default_basic = [
-            {"Kode": "L01", "Nama": "Pekerja", "Sat": "OH", "Harga": 120000},
-            {"Kode": "M01", "Nama": "Semen PC 50kg", "Sat": "Zak", "Harga": 68000},
-        ]
+        self.default_info = {
+            "name": "PEMBANGUNAN RUKO 2 LANTAI",
+            "owner": "BAPAK RIO",
+            "cont": "SMART STUDIO",
+            "fee_pct": 10.0,
+            "tax_pct": 11.0
+        }
 
     def init_session(self):
-        """Memastikan session state terisi"""
-        if 'project_data' not in st.session_state:
-            st.session_state.project_data = {
-                "info": self.default_info,
-                "boq": self.default_boq,
-                "basic": self.default_basic
-            }
-
-    def get_data(self):
-        """Mengambil data mentah untuk Editor"""
-        self.init_session()
-        return st.session_state.project_data
-
-    def calculate_rab(self):
-        """
-        Menghitung RAB secara on-the-fly.
-        Mengembalikan tuple: (DataFrame Lengkap, Dictionary Rekap)
-        """
-        data = self.get_data()
-        df = pd.DataFrame(data['boq'])
+        # Inisialisasi 'rab_editor_data' langsung ke session state jika belum ada
+        # Ini adalah kunci agar tidak looping
+        if 'rab_editor_data' not in st.session_state:
+            st.session_state['rab_editor_data'] = self.default_boq
         
-        # Sanitasi Data (Penting agar tidak error saat dikalikan)
+        if 'project_info' not in st.session_state:
+            st.session_state['project_info'] = self.default_info
+
+    def calculate_from_state(self):
+        """
+        Menghitung RAB langsung dari Session State Editor.
+        Ini memastikan perhitungan selalu memakai data TERBARU hasil input user,
+        bahkan sebelum Editor dirender ulang.
+        """
+        # 1. Ambil data mentah dari key Editor
+        raw_data = st.session_state['rab_editor_data']
+        info = st.session_state['project_info']
+        
+        df = pd.DataFrame(raw_data)
+        
+        # 2. Sanitasi (Pastikan angka aman)
         df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0)
         df['HargaSatuan'] = pd.to_numeric(df['HargaSatuan'], errors='coerce').fillna(0)
         
-        # Hitung Total
+        # 3. Hitung Total
         df['JumlahHarga'] = df['Volume'] * df['HargaSatuan']
         
-        # Hitung Grand Total
+        # 4. Hitung Rekap Global
         real_cost = df['JumlahHarga'].sum()
-        fee_val = real_cost * (data['info']['fee_pct'] / 100)
+        fee_val = real_cost * (info['fee_pct'] / 100)
         subtotal = real_cost + fee_val
-        tax_val = subtotal * (data['info']['tax_pct'] / 100)
+        tax_val = subtotal * (info['tax_pct'] / 100)
         grand_total = subtotal + tax_val
         
         summary = {
@@ -75,19 +67,5 @@ class EnginexBackend:
         
         return df, summary
 
-    def update_boq(self, new_df):
-        """
-        Menyimpan data dari Editor kembali ke Session State.
-        PENTING: Kita buang kolom 'JumlahHarga' agar tidak double store.
-        """
-        # Hapus kolom hasil hitungan (derived column)
-        if 'JumlahHarga' in new_df.columns:
-            clean_df = new_df.drop(columns=['JumlahHarga'])
-        else:
-            clean_df = new_df
-            
-        # Simpan ke state
-        st.session_state.project_data['boq'] = clean_df.to_dict('records')
-        
     def fmt_idr(self, val):
         return f"Rp {val:,.0f}".replace(",", ".")
