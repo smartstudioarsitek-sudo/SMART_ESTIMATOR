@@ -3,8 +3,8 @@ import streamlit as st
 
 class EnginexBackend:
     def __init__(self):
-        # Data Default (Jika belum ada)
-        self.default_boq = [
+        # Kita definisikan data langsung sebagai DataFrame agar konsisten
+        self.default_boq = pd.DataFrame([
             {"Divisi": "I. PERSIAPAN", "Uraian": "Pengukuran & Bouwplank", "Satuan": "m2", "Volume": 425.18, "HargaSatuan": 15000},
             {"Divisi": "I. PERSIAPAN", "Uraian": "Direksi Keet & Gudang", "Satuan": "Ls", "Volume": 1.0, "HargaSatuan": 15000000},
             {"Divisi": "II. TANAH", "Uraian": "Galian Tanah Pondasi", "Satuan": "m3", "Volume": 166.37, "HargaSatuan": 85000},
@@ -12,7 +12,7 @@ class EnginexBackend:
             {"Divisi": "III. LANTAI 1", "Uraian": "Beton Kolom Lt 1", "Satuan": "m3", "Volume": 12.18, "HargaSatuan": 4500000},
             {"Divisi": "III. LANTAI 1", "Uraian": "Dinding Bata Ringan", "Satuan": "m2", "Volume": 397.27, "HargaSatuan": 135000},
             {"Divisi": "IV. LANTAI 2", "Uraian": "Beton Balok Lt 2", "Satuan": "m3", "Volume": 21.28, "HargaSatuan": 4800000},
-        ]
+        ])
         
         self.default_info = {
             "name": "PEMBANGUNAN RUKO 2 LANTAI",
@@ -23,34 +23,38 @@ class EnginexBackend:
         }
 
     def init_session(self):
-        # Inisialisasi 'rab_editor_data' langsung ke session state jika belum ada
-        # Ini adalah kunci agar tidak looping
-        if 'rab_editor_data' not in st.session_state:
-            st.session_state['rab_editor_data'] = self.default_boq
+        # Inisialisasi Session State dengan DataFrame
+        if 'project_data_boq' not in st.session_state:
+            st.session_state['project_data_boq'] = self.default_boq.copy()
         
         if 'project_info' not in st.session_state:
             st.session_state['project_info'] = self.default_info
 
-    def calculate_from_state(self):
+    def get_boq_data(self):
+        """Mengambil data BOQ murni (Input User)"""
+        return st.session_state['project_data_boq']
+
+    def update_boq_data(self, new_df):
+        """Menyimpan data BOQ baru ke session"""
+        st.session_state['project_data_boq'] = new_df
+
+    def calculate_rab(self, df_input):
         """
-        Menghitung RAB langsung dari Session State Editor.
-        Ini memastikan perhitungan selalu memakai data TERBARU hasil input user,
-        bahkan sebelum Editor dirender ulang.
+        Menghitung RAB berdasarkan DataFrame Input.
+        Tidak mengubah state, hanya mengembalikan hasil hitungan.
         """
-        # 1. Ambil data mentah dari key Editor
-        raw_data = st.session_state['rab_editor_data']
+        # Copy agar tidak merusak data asli
+        df = df_input.copy()
         info = st.session_state['project_info']
         
-        df = pd.DataFrame(raw_data)
-        
-        # 2. Sanitasi (Pastikan angka aman)
+        # 1. Sanitasi Angka (Cegah Error)
         df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0)
         df['HargaSatuan'] = pd.to_numeric(df['HargaSatuan'], errors='coerce').fillna(0)
         
-        # 3. Hitung Total
+        # 2. Hitung Total
         df['JumlahHarga'] = df['Volume'] * df['HargaSatuan']
         
-        # 4. Hitung Rekap Global
+        # 3. Hitung Rekap Global
         real_cost = df['JumlahHarga'].sum()
         fee_val = real_cost * (info['fee_pct'] / 100)
         subtotal = real_cost + fee_val
