@@ -4,279 +4,185 @@ import numpy as np
 from datetime import datetime
 
 # ==========================================
-# 1. KONFIGURASI SISTEM & STYLE
+# 1. PAGE CONFIG
 # ==========================================
 st.set_page_config(
-    page_title="RAB SmartStudio - Pro System",
+    page_title="RAB SmartStudio PRO",
     page_icon="🏗️",
     layout="wide"
 )
 
-# Custom CSS untuk meniru nuansa "Clean & Professional" dari kode asli
+# Style CSS
 st.markdown("""
     <style>
-    .main { background-color: #f1f5f9; }
+    .main { background-color: #f8fafc; }
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: white;
-        border-radius: 4px;
-        color: #64748b;
-        font-weight: 600;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #1e3a8a !important;
-        color: white !important;
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 26px;
-        color: #1e3a8a;
-        font-weight: bold;
-    }
-    .css-1r6slb0 { background-color: white; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; }
+    .stTabs [data-baseweb="tab"] { background-color: white; border-radius: 4px; }
+    .stTabs [aria-selected="true"] { background-color: #1e3a8a !important; color: white !important; }
+    div[data-testid="stMetricValue"] { font-size: 24px; color: #1e3a8a; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. INISIALISASI DATA (SESSION STATE)
+# 2. INISIALISASI STATE (HANYA SEKALI)
 # ==========================================
-if 'project_data' not in st.session_state:
-    # Mengonversi Data JS 'db' Anda ke Python Dictionary
-    st.session_state.project_data = {
-        "info": {
-            "name": "PEMBANGUNAN RUKO 2 LANTAI (4 UNIT)",
-            "loc": "DENPASAR - BALI",
-            "year": "2026",
-            "owner": "BAPAK RIO",
-            "cont": "SMART STUDIO",
-            "fee_pct": 10.0,
-            "tax_pct": 11.0
-        },
-        # Data BOQ/RAB (Versi DataFrame-ready)
-        "boq": [
-            # I. PERSIAPAN
-            {"Divisi": "I. PERSIAPAN", "Uraian": "Pengukuran & Bouwplank", "Satuan": "m2", "Volume": 425.18, "HargaSatuan": 15000},
-            {"Divisi": "I. PERSIAPAN", "Uraian": "Pembersihan Lahan", "Satuan": "m2", "Volume": 425.18, "HargaSatuan": 12500},
-            {"Divisi": "I. PERSIAPAN", "Uraian": "Direksi Keet & Gudang", "Satuan": "Ls", "Volume": 1.0, "HargaSatuan": 15000000},
-            {"Divisi": "I. PERSIAPAN", "Uraian": "Air & Listrik Kerja", "Satuan": "Ls", "Volume": 1.0, "HargaSatuan": 7500000},
-            # II. TANAH
-            {"Divisi": "II. TANAH", "Uraian": "Galian Tanah Pondasi", "Satuan": "m3", "Volume": 166.37, "HargaSatuan": 85000},
-            {"Divisi": "II. TANAH", "Uraian": "Urugan Pasir Bawah", "Satuan": "m3", "Volume": 7.76, "HargaSatuan": 220000},
-            {"Divisi": "II. TANAH", "Uraian": "Pasangan Batu Kali", "Satuan": "m3", "Volume": 57.83, "HargaSatuan": 950000},
-            {"Divisi": "II. TANAH", "Uraian": "Beton Footplate (K-250)", "Satuan": "m3", "Volume": 15.90, "HargaSatuan": 1350000},
-            {"Divisi": "II. TANAH", "Uraian": "Beton Sloof", "Satuan": "m3", "Volume": 15.52, "HargaSatuan": 1450000},
-            # III. LANTAI 1
-            {"Divisi": "III. LANTAI 1", "Uraian": "Beton Kolom Lt 1", "Satuan": "m3", "Volume": 12.18, "HargaSatuan": 4500000}, # Include Besi+Bekisting (Average)
-            {"Divisi": "III. LANTAI 1", "Uraian": "Dinding Bata Ringan", "Satuan": "m2", "Volume": 397.27, "HargaSatuan": 135000},
-            {"Divisi": "III. LANTAI 1", "Uraian": "Plesteran Dinding", "Satuan": "m2", "Volume": 794.54, "HargaSatuan": 65000},
-            {"Divisi": "III. LANTAI 1", "Uraian": "Lantai Granit Utama", "Satuan": "m2", "Volume": 239.48, "HargaSatuan": 285000},
-            # IV. LANTAI 2
-            {"Divisi": "IV. LANTAI 2", "Uraian": "Beton Balok Lt 2", "Satuan": "m3", "Volume": 21.28, "HargaSatuan": 4800000},
-            {"Divisi": "IV. LANTAI 2", "Uraian": "Beton Plat Lantai", "Satuan": "m3", "Volume": 33.80, "HargaSatuan": 4200000},
-            {"Divisi": "IV. LANTAI 2", "Uraian": "Dinding Bata Ringan", "Satuan": "m2", "Volume": 383.15, "HargaSatuan": 135000},
-            {"Divisi": "IV. LANTAI 2", "Uraian": "Lantai Granit Lt 2", "Satuan": "m2", "Volume": 268.05, "HargaSatuan": 285000},
-        ],
-        # Data Harga Dasar (Basic Prices)
-        "basic": [
-            {"Kode": "L01", "Kategori": "Upah", "Nama": "Pekerja", "Sat": "OH", "Harga": 120000},
-            {"Kode": "L02", "Kategori": "Upah", "Nama": "Tukang Batu", "Sat": "OH", "Harga": 160000},
-            {"Kode": "M01", "Kategori": "Material", "Nama": "Semen Portland", "Sat": "Zak", "Harga": 68000},
-            {"Kode": "M04", "Kategori": "Material", "Nama": "Pasir Beton", "Sat": "m3", "Harga": 350000},
-            {"Kode": "M16", "Kategori": "Material", "Nama": "Besi Beton", "Sat": "Kg", "Harga": 14500},
-        ]
-    }
+# Kita gunakan fungsi ini agar data tidak ter-reset saat muter-muter
+def init_data():
+    if 'project_data' not in st.session_state:
+        st.session_state.project_data = {
+            "info": {
+                "name": "PEMBANGUNAN RUKO 2 LANTAI",
+                "loc": "DENPASAR - BALI",
+                "year": "2026",
+                "owner": "BAPAK RIO",
+                "cont": "SMART STUDIO",
+                "fee_pct": 10.0,
+                "tax_pct": 11.0
+            },
+            # PERHATIKAN: TIDAK ADA KOLOM 'TOTAL' ATAU 'JUMLAH HARGA' DISINI
+            # HANYA KOLOM INPUT MURNI AGAR TIDAK LOOPING
+            "boq": [
+                {"Divisi": "I. PERSIAPAN", "Uraian": "Pengukuran & Bouwplank", "Satuan": "m2", "Volume": 425.18, "HargaSatuan": 15000},
+                {"Divisi": "I. PERSIAPAN", "Uraian": "Direksi Keet & Gudang", "Satuan": "Ls", "Volume": 1.0, "HargaSatuan": 15000000},
+                {"Divisi": "II. TANAH", "Uraian": "Galian Tanah Pondasi", "Satuan": "m3", "Volume": 166.37, "HargaSatuan": 85000},
+                {"Divisi": "II. TANAH", "Uraian": "Urugan Pasir Bawah", "Satuan": "m3", "Volume": 7.76, "HargaSatuan": 220000},
+                {"Divisi": "III. LANTAI 1", "Uraian": "Beton Kolom Lt 1", "Satuan": "m3", "Volume": 12.18, "HargaSatuan": 4500000},
+                {"Divisi": "III. LANTAI 1", "Uraian": "Dinding Bata Ringan", "Satuan": "m2", "Volume": 397.27, "HargaSatuan": 135000},
+                {"Divisi": "IV. LANTAI 2", "Uraian": "Beton Balok Lt 2", "Satuan": "m3", "Volume": 21.28, "HargaSatuan": 4800000},
+            ],
+            "basic": [
+                {"Kode": "L01", "Nama": "Pekerja", "Sat": "OH", "Harga": 120000},
+                {"Kode": "M01", "Nama": "Semen PC 50kg", "Sat": "Zak", "Harga": 68000},
+            ]
+        }
+
+# Panggil fungsi init
+init_data()
 
 # ==========================================
-# 3. LOGIC ENGINE (CALCULATOR)
+# 3. LOGIC ENGINE (HITUNG DI MEMORI)
 # ==========================================
-def run_calculation():
-    """
-    Fungsi ini menghitung ulang seluruh RAB tanpa mengubah state secara langsung
-    untuk mencegah Infinite Loop pada Streamlit.
-    """
-    info = st.session_state.project_data['info']
-    
-    # Load Dataframe
-    df = pd.DataFrame(st.session_state.project_data['boq'])
-    
-    # Sanitasi Input (Pastikan Angka)
-    df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0)
-    df['HargaSatuan'] = pd.to_numeric(df['HargaSatuan'], errors='coerce').fillna(0)
-    
-    # Hitung Total Per Item
-    df['JumlahHarga'] = df['Volume'] * df['HargaSatuan']
-    
-    # Hitung Rekap
-    real_cost = df['JumlahHarga'].sum()
-    fee_val = real_cost * (info['fee_pct'] / 100)
-    subtotal = real_cost + fee_val
-    tax_val = subtotal * (info['tax_pct'] / 100)
-    grand_total = subtotal + tax_val
-    
-    return df, real_cost, fee_val, subtotal, tax_val, grand_total
-
-def terbilang(n):
-    # Fungsi sederhana terbilang (placeholder)
-    return f"{n:,.0f} (Rupiah)"
-
+# Helper Format Rupiah
 def fmt_idr(n):
     return f"Rp {n:,.0f}".replace(",", ".")
 
+# Shortcut ke variable info
+info = st.session_state.project_data['info']
+
+# --- PROSES PERHITUNGAN (ANTI LOOP) ---
+# 1. Ambil data mentah dari session state
+df_raw = pd.DataFrame(st.session_state.project_data['boq'])
+
+# 2. Pastikan tipe data numeric (PENTING: Mencegah error tipe data)
+df_raw['Volume'] = pd.to_numeric(df_raw['Volume'], errors='coerce').fillna(0)
+df_raw['HargaSatuan'] = pd.to_numeric(df_raw['HargaSatuan'], errors='coerce').fillna(0)
+
+# 3. Hitung 'Total' di Dataframe SEMENTARA (df_calc)
+# df_calc inilah yang akan ditampilkan, tapi TIDAK disimpan mentah-mentah
+df_calc = df_raw.copy()
+df_calc['JumlahHarga'] = df_calc['Volume'] * df_calc['HargaSatuan']
+
+# 4. Hitung Grand Total
+real_cost = df_calc['JumlahHarga'].sum()
+fee_val = real_cost * (info['fee_pct'] / 100)
+subtotal = real_cost + fee_val
+tax_val = subtotal * (info['tax_pct'] / 100)
+grand_total = subtotal + tax_val
+
 # ==========================================
-# 4. UI SIDEBAR (SETTINGS)
+# 4. SIDEBAR
 # ==========================================
 with st.sidebar:
-    st.title("⚙️ Project Settings")
-    
-    # Shortcut variables
-    info = st.session_state.project_data['info']
-    
-    info['name'] = st.text_input("Nama Kegiatan", info['name'])
-    info['loc'] = st.text_input("Lokasi", info['loc'])
-    info['year'] = st.text_input("Tahun", info['year'])
-    st.divider()
-    info['owner'] = st.text_input("Pemilik (Owner)", info['owner'])
+    st.title("⚙️ Pengaturan")
+    info['name'] = st.text_input("Nama Proyek", info['name'])
+    info['owner'] = st.text_input("Owner", info['owner'])
     info['cont'] = st.text_input("Kontraktor", info['cont'])
     st.divider()
+    info['fee_pct'] = st.number_input("Fee (%)", value=info['fee_pct'])
+    info['tax_pct'] = st.number_input("PPN (%)", value=info['tax_pct'])
     
-    c1, c2 = st.columns(2)
-    with c1: info['fee_pct'] = st.number_input("Fee (%)", value=info['fee_pct'])
-    with c2: info['tax_pct'] = st.number_input("PPN (%)", value=info['tax_pct'])
-    
-    if st.button("💾 Reset Data"):
-        st.session_state.clear()
+    if st.button("🔴 Reset Data"):
+        del st.session_state['project_data']
         st.rerun()
 
 # ==========================================
-# 5. MAIN APPLICATION
+# 5. MAIN UI TABS
 # ==========================================
+t_cover, t_rekap, t_rab, t_basic = st.tabs(["0. Cover", "1. Rekapitulasi", "2. RAB Detail", "3. Harga Dasar"])
 
-# Run Calculation First (Data Driven)
-df_rab, real_cost, fee_val, subtotal, tax_val, grand_total = run_calculation()
-
-# Header
-c_head1, c_head2 = st.columns([1, 4])
-with c_head1:
-    st.markdown('<div style="background:#1e3a8a;color:white;width:50px;height:50px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:24px;">S</div>', unsafe_allow_html=True)
-with c_head2:
-    st.markdown(f"**SMART STUDIO ESTIMATOR**\n\n<span style='color:grey;font-size:12px;'>Project: {info['name']}</span>", unsafe_allow_html=True)
-
-st.markdown("---")
-
-# Tabs Navigation
-tabs = st.tabs(["📑 0. Project Identity", "📊 1. Rekapitulasi", "📝 2. RAB Detail", "💰 3. Harga Dasar"])
-
-# --- TAB 0: COVER ---
-with tabs[0]:
+# --- TAB COVER ---
+with t_cover:
     st.markdown(f"""
-    <div style="background:white; padding:40px; border:2px solid #e2e8f0; text-align:center; border-radius:10px;">
-        <h2 style="color:#0f172a; margin-bottom:0;">RENCANA ANGGARAN BIAYA</h2>
-        <p style="letter-spacing:3px; font-weight:bold; color:#94a3b8; font-size:12px;">ENGINEERING ESTIMATE (EE)</p>
-        <hr style="margin:20px 0;">
-        
-        <div style="display:grid; grid-template-columns:1fr 1fr; text-align:left; gap:20px; margin-bottom:40px;">
-            <div>
-                <p style="font-size:10px; font-weight:bold; color:#94a3b8;">KEGIATAN</p>
-                <p style="font-weight:bold;">{info['name']}</p>
-            </div>
-            <div>
-                <p style="font-size:10px; font-weight:bold; color:#94a3b8;">LOKASI</p>
-                <p style="font-weight:bold;">{info['loc']}</p>
-            </div>
-        </div>
-        
-        <div style="background:#0f172a; color:white; padding:30px; border-radius:12px; margin-bottom:40px;">
-            <p style="margin:0; font-size:12px; letter-spacing:2px;">TOTAL ESTIMASI BIAYA</p>
-            <h1 style="margin:10px 0; font-size:48px; color:#fbbf24;">{fmt_idr(grand_total)}</h1>
-            <p style="font-style:italic; font-size:14px; opacity:0.7;">(Termasuk Jasa {info['fee_pct']}% & PPN {info['tax_pct']}%)</p>
-        </div>
-        
-        <div style="display:flex; justify-content:space-between; padding:0 50px;">
-            <div style="text-align:center;">
-                <p style="font-size:10px; font-weight:bold; color:#64748b;">DISETUJUI OLEH:</p>
-                <br><br><br>
-                <p style="border-bottom:1px solid #000; font-weight:bold; padding-bottom:5px;">{info['owner']}</p>
-                <p style="font-size:12px;">OWNER</p>
-            </div>
-            <div style="text-align:center;">
-                <p style="font-size:10px; font-weight:bold; color:#64748b;">DIBUAT OLEH:</p>
-                <br><br><br>
-                <p style="border-bottom:1px solid #000; font-weight:bold; padding-bottom:5px;">{info['cont']}</p>
-                <p style="font-size:12px;">KONTRAKTOR</p>
-            </div>
+    <div style="text-align:center; padding:30px; border:4px double #1e3a8a; border-radius:10px; background:white;">
+        <h2 style="color:#1e3a8a;">RENCANA ANGGARAN BIAYA</h2>
+        <hr>
+        <h1>{fmt_idr(grand_total)}</h1>
+        <p>Proyek: {info['name']} | Lokasi: {info['loc']}</p>
+        <div style="display:flex; justify-content:space-around; margin-top:30px;">
+            <div><b>Disetujui:</b><br><br>{info['owner']}</div>
+            <div><b>Dibuat:</b><br><br>{info['cont']}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# --- TAB 1: REKAPITULASI ---
-with tabs[1]:
-    col_metrics = st.columns(3)
-    col_metrics[0].metric("Total Konstruksi", fmt_idr(real_cost))
-    col_metrics[1].metric(f"Jasa ({info['fee_pct']}%)", fmt_idr(fee_val))
-    col_metrics[2].metric("Grand Total (+PPN)", fmt_idr(grand_total))
+# --- TAB REKAPITULASI ---
+with t_rekap:
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Real Cost", fmt_idr(real_cost))
+    c2.metric("Jasa + PPN", fmt_idr(fee_val + tax_val))
+    c3.metric("GRAND TOTAL", fmt_idr(grand_total))
     
-    st.subheader("Rekapitulasi Per Divisi")
-    
-    # Grouping logic
-    rekap_df = df_rab.groupby('Divisi')['JumlahHarga'].sum().reset_index()
-    rekap_df['Bobot (%)'] = (rekap_df['JumlahHarga'] / real_cost * 100).fillna(0)
-    
-    st.dataframe(
-        rekap_df,
-        column_config={
-            "Divisi": st.column_config.TextColumn("Uraian Pekerjaan"),
-            "JumlahHarga": st.column_config.NumberColumn("Jumlah Harga (Rp)", format="Rp %d"),
-            "Bobot (%)": st.column_config.ProgressColumn("Bobot", format="%.2f%%", min_value=0, max_value=100)
-        },
-        use_container_width=True,
-        hide_index=True
-    )
+    rekap_div = df_calc.groupby('Divisi')['JumlahHarga'].sum().reset_index()
+    rekap_div['Bobot (%)'] = (rekap_div['JumlahHarga'] / real_cost * 100).fillna(0)
+    st.dataframe(rekap_div, use_container_width=True, hide_index=True, column_config={"JumlahHarga": st.column_config.NumberColumn(format="Rp %d")})
 
-# --- TAB 2: RAB DETAIL (THE CORE) ---
-with tabs[2]:
-    st.info("💡 **Petunjuk:** Ubah angka pada kolom **Volume** atau **Harga Satuan**. Tekan Enter untuk update Total.")
+# --- TAB RAB DETAIL (CRITICAL PART - JANGAN UBAH BAGIAN INI) ---
+with t_rab:
+    st.info("Ketik angka di tabel, tekan Enter. Perhitungan otomatis.")
     
-    # Editable Dataframe
+    # KITA GUNAKAN LOGIKA KHUSUS DISINI
     edited_df = st.data_editor(
-        df_rab,
+        df_calc, # Kita tampilkan dataframe yang SUDAH ada kolom JumlahHarga
         column_config={
-            "Divisi": st.column_config.SelectboxColumn("Divisi", options=["I. PERSIAPAN", "II. TANAH", "III. LANTAI 1", "IV. LANTAI 2", "V. ATAP"], width="medium"),
-            "Uraian": st.column_config.TextColumn("Uraian Pekerjaan", width="large"),
-            "Volume": st.column_config.NumberColumn("Vol", format="%.2f"),
-            "Satuan": st.column_config.TextColumn("Sat", width="small"),
-            "HargaSatuan": st.column_config.NumberColumn("Harga Satuan", format="Rp %d"),
-            "JumlahHarga": st.column_config.NumberColumn("Jumlah Harga", format="Rp %d", disabled=True) # Read-only calculated field
+            "Divisi": st.column_config.SelectboxColumn(options=["I. PERSIAPAN", "II. TANAH", "III. LANTAI 1", "IV. LANTAI 2", "V. ATAP"], required=True),
+            "Uraian": st.column_config.TextColumn(width="large", required=True),
+            "Volume": st.column_config.NumberColumn(required=True, format="%.2f"),
+            "HargaSatuan": st.column_config.NumberColumn(required=True, format="Rp %d"),
+            # KUNCI KOLOM JUMLAH HARGA AGAR TIDAK DIEDIT USER (INI MENCEGAH LOOP)
+            "JumlahHarga": st.column_config.NumberColumn(disabled=True, format="Rp %d") 
         },
         num_rows="dynamic",
         use_container_width=True,
-        key="editor_rab"
+        key="editor_utama" # Key ini penting agar Streamlit melacak state
     )
-    
-    # Save Logic (Anti-Circular Loop)
-    # Kita hanya menyimpan kolom INPUT, bukan kolom HASIL (JumlahHarga)
-    if edited_df is not None:
-        cols_to_save = ["Divisi", "Uraian", "Satuan", "Volume", "HargaSatuan"]
-        # Konversi ke list of dicts untuk disimpan ke session state
-        st.session_state.project_data['boq'] = edited_df[cols_to_save].to_dict('records')
 
-# --- TAB 3: HARGA DASAR ---
-with tabs[3]:
-    st.subheader("Database Harga Dasar (Material & Upah)")
+    # --- THE FIX: CARA MENYIMPAN DATA AGAR TIDAK MUTER ---
+    if edited_df is not None:
+        # 1. Kita buang kolom 'JumlahHarga' yang dihitung otomatis tadi
+        #    Karena kita hanya ingin menyimpan INPUT user (Volume & HargaSatuan)
+        clean_df = edited_df.drop(columns=['JumlahHarga'])
+        
+        # 2. Konversi ke List of Dictionaries
+        new_data = clean_df.to_dict('records')
+        
+        # 3. Cek apakah ada perbedaan dengan data lama?
+        #    Hanya update session_state JIKA benar-benar ada data baru
+        if new_data != st.session_state.project_data['boq']:
+            st.session_state.project_data['boq'] = new_data
+            st.rerun() # Force refresh seketika agar angka total update
+
+# --- TAB HARGA DASAR ---
+with t_basic:
     basic_df = pd.DataFrame(st.session_state.project_data['basic'])
-    
-    edited_basic = st.data_editor(
-        basic_df,
-        column_config={
-            "Kode": st.column_config.TextColumn(disabled=True),
-            "Harga": st.column_config.NumberColumn(format="Rp %d")
-        },
-        num_rows="dynamic",
-        use_container_width=True,
-        key="editor_basic"
-    )
+    edited_basic = st.data_editor(basic_df, num_rows="dynamic", use_container_width=True, key="editor_basic")
     
     if edited_basic is not None:
-        st.session_state.project_data['basic'] = edited_basic.to_dict('records')
+        # Logika simpan yang sama
+        new_basic = edited_basic.to_dict('records')
+        if new_basic != st.session_state.project_data['basic']:
+            st.session_state.project_data['basic'] = new_basic
+            # Tidak perlu rerun disini jika tidak mempengaruhi RAB langsung, tapi aman jika dipakai
 
 # Footer
 st.markdown("---")
-st.markdown(f"<div style='text-align:center; color:#94a3b8; font-size:12px;'>Generated by GEMS SmartStudio Python Engine | {datetime.now().strftime('%d %B %Y')}</div>", unsafe_allow_html=True)
+st.caption("GEMS Grandmaster System | Stable Core V4.0")
