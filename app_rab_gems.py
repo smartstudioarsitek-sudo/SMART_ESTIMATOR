@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-# Pastikan nama file backend_enginex.py (bukan backend_enginex (3).py)
 from backend_enginex import EnginexBackend
 
 # ==========================================
@@ -21,18 +20,17 @@ st.markdown("""
 # ==========================================
 # 2. LOAD BACKEND
 # ==========================================
-# Cache resource agar backend tidak di-init ulang setiap rerun (opsional tapi bagus)
 @st.cache_resource
 def get_engine():
     return EnginexBackend()
 
 engine = get_engine()
-engine.init_session()
+engine.init_session() # Pastikan data awal masuk ke session state
 
 # ==========================================
 # 3. LOGIC (CALCULATE FIRST)
 # ==========================================
-# Hitung ulang berdasarkan data terakhir di state
+# Hitung dulu agar Tab Dashboard & Analisa langsung muncul angka
 df_calc, summary = engine.calculate_from_state()
 info = st.session_state['project_info']
 
@@ -42,7 +40,7 @@ info = st.session_state['project_info']
 with st.sidebar:
     st.title("⚙️ Project Control")
     
-    # Callback update sederhana
+    # Fungsi helper untuk update info project
     def update_info(key_name):
         st.session_state['project_info'][key_name] = st.session_state[f"inp_{key_name}"]
 
@@ -84,21 +82,36 @@ with t0:
 
 # --- TAB 1: INPUT RAB ---
 with t1:
-    st.info("💡 Edit **Volume** atau **Harga Satuan**. Total hitungan otomatis update.")
+    st.info("💡 Edit **Volume** atau **Harga Satuan**. Tekan Enter untuk update total.")
     
-    # Siapkan DataFrame untuk ditampilkan
-    # Kita ambil kolom yang diperlukan saja dari hasil hitungan
+    # --- FUNGSI SINKRONISASI (SOLUSI ERROR) ---
+    def sync_editor():
+        # Ambil data dari temporary editor key
+        edited_data = st.session_state['temp_editor_key']
+        
+        # Konversi ke format list of dict (standar backend)
+        # Jika edited_data adalah DataFrame, kita convert. Jika list, biarkan.
+        if isinstance(edited_data, pd.DataFrame):
+            raw_data = edited_data.to_dict('records')
+        else:
+            raw_data = edited_data
+            
+        # Update MASTER STATE ('rab_editor_data') yang dipakai backend
+        st.session_state['rab_editor_data'] = raw_data
+
+    # Siapkan DataFrame Tampilan
     display_df = df_calc[["Divisi", "Uraian", "Satuan", "Volume", "HargaSatuan", "JumlahHarga"]]
 
     edited_df = st.data_editor(
         display_df,
-        key="rab_editor_data", # KUNCI: Langsung bind ke session state
+        key="temp_editor_key", # Key BEDA dengan master state agar tidak conflict
+        on_change=sync_editor, # Panggil fungsi sync saat ada perubahan
         column_config={
             "Divisi": st.column_config.SelectboxColumn(options=["I. PERSIAPAN", "II. TANAH", "III. LANTAI 1", "IV. LANTAI 2"], required=True),
             "Uraian": st.column_config.TextColumn(width="large", required=True),
             "Volume": st.column_config.NumberColumn(format="%.2f", required=True),
             "HargaSatuan": st.column_config.NumberColumn(format="Rp %d", required=True),
-            "JumlahHarga": st.column_config.NumberColumn(format="Rp %d", disabled=True) # Read-only agar user tidak bingung
+            "JumlahHarga": st.column_config.NumberColumn(format="Rp %d", disabled=True) # Read-only
         },
         num_rows="dynamic",
         use_container_width=True
@@ -126,4 +139,4 @@ with t2:
         st.warning("Belum ada data.")
 
 st.markdown("---")
-st.caption("Powered by GEMS EngineX")
+st.caption("Powered by GEMS EngineX | Zero-Loop Architecture")
