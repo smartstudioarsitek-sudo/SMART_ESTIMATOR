@@ -1,71 +1,139 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
+from backend_enginex import EnginexBackend
 
-class EnginexBackend:
-    def __init__(self):
-        # Data Default (Jika belum ada)
-        self.default_boq = [
-            {"Divisi": "I. PERSIAPAN", "Uraian": "Pengukuran & Bouwplank", "Satuan": "m2", "Volume": 425.18, "HargaSatuan": 15000},
-            {"Divisi": "I. PERSIAPAN", "Uraian": "Direksi Keet & Gudang", "Satuan": "Ls", "Volume": 1.0, "HargaSatuan": 15000000},
-            {"Divisi": "II. TANAH", "Uraian": "Galian Tanah Pondasi", "Satuan": "m3", "Volume": 166.37, "HargaSatuan": 85000},
-            {"Divisi": "II. TANAH", "Uraian": "Urugan Pasir Bawah", "Satuan": "m3", "Volume": 7.76, "HargaSatuan": 220000},
-            {"Divisi": "III. LANTAI 1", "Uraian": "Beton Kolom Lt 1", "Satuan": "m3", "Volume": 12.18, "HargaSatuan": 4500000},
-            {"Divisi": "III. LANTAI 1", "Uraian": "Dinding Bata Ringan", "Satuan": "m2", "Volume": 397.27, "HargaSatuan": 135000},
-            {"Divisi": "IV. LANTAI 2", "Uraian": "Beton Balok Lt 2", "Satuan": "m3", "Volume": 21.28, "HargaSatuan": 4800000},
-        ]
-        
-        self.default_info = {
-            "name": "PEMBANGUNAN RUKO 2 LANTAI",
-            "owner": "BAPAK RIO",
-            "cont": "SMART STUDIO",
-            "fee_pct": 10.0,
-            "tax_pct": 11.0
-        }
+# ==========================================
+# 1. SETUP & STYLE
+# ==========================================
+st.set_page_config(page_title="GEMS EngineX Pro", page_icon="🏗️", layout="wide")
 
-    def init_session(self):
-        # Inisialisasi 'rab_editor_data' langsung ke session state jika belum ada
-        # Ini adalah kunci agar tidak looping
-        if 'rab_editor_data' not in st.session_state:
-            st.session_state['rab_editor_data'] = self.default_boq
-        
-        if 'project_info' not in st.session_state:
-            st.session_state['project_info'] = self.default_info
+st.markdown("""
+<style>
+    .main { background-color: #f8fafc; }
+    div[data-testid="stMetricValue"] { font-size: 24px; color: #1e3a8a; font-weight: bold; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { background-color: white; border-radius: 4px; border: 1px solid #e2e8f0; }
+    .stTabs [aria-selected="true"] { background-color: #1e3a8a !important; color: white !important; }
+</style>
+""", unsafe_allow_html=True)
 
-    def calculate_from_state(self):
-        """
-        Menghitung RAB langsung dari Session State Editor.
-        Ini memastikan perhitungan selalu memakai data TERBARU hasil input user,
-        bahkan sebelum Editor dirender ulang.
-        """
-        # 1. Ambil data mentah dari key Editor
-        raw_data = st.session_state['rab_editor_data']
-        info = st.session_state['project_info']
-        
-        df = pd.DataFrame(raw_data)
-        
-        # 2. Sanitasi (Pastikan angka aman)
-        df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0)
-        df['HargaSatuan'] = pd.to_numeric(df['HargaSatuan'], errors='coerce').fillna(0)
-        
-        # 3. Hitung Total
-        df['JumlahHarga'] = df['Volume'] * df['HargaSatuan']
-        
-        # 4. Hitung Rekap Global
-        real_cost = df['JumlahHarga'].sum()
-        fee_val = real_cost * (info['fee_pct'] / 100)
-        subtotal = real_cost + fee_val
-        tax_val = subtotal * (info['tax_pct'] / 100)
-        grand_total = subtotal + tax_val
-        
-        summary = {
-            "real_cost": real_cost,
-            "fee_val": fee_val,
-            "subtotal": subtotal,
-            "tax_val": tax_val,
-            "grand_total": grand_total
-        }
-        
-        return df, summary
+# ==========================================
+# 2. LOAD BACKEND
+# ==========================================
+engine = EnginexBackend()
+engine.init_session() # Pastikan data awal masuk ke session state
 
-    def fmt_idr(self, val):
-        return f"Rp {val:,.0f}".replace(",", ".")
+# ==========================================
+# 3. LOGIC (STATE-FIRST APPROACH)
+# ==========================================
+# PENTING: Kita hitung dulu RAB menggunakan data yang ada di session state 'rab_editor_data'.
+# Saat user mengedit tabel, Streamlit otomatis update 'rab_editor_data' SEBELUM baris ini jalan.
+# Jadi hasil 'df_calc' & 'summary' pasti sudah memakai angka terbaru.
+df_calc, summary = engine.calculate_from_state()
+info = st.session_state['project_info']
+
+# ==========================================
+# 4. SIDEBAR
+# ==========================================
+with st.sidebar:
+    st.title("⚙️ Project Control")
+    # Menggunakan key untuk langsung bind ke session state (Anti-Lag)
+    st.text_input("Nama Proyek", key="name_input", value=info['name'], 
+                  on_change=lambda: st.session_state['project_info'].update({'name': st.session_state.name_input}))
+    
+    st.text_input("Owner", key="owner_input", value=info['owner'], 
+                  on_change=lambda: st.session_state['project_info'].update({'owner': st.session_state.owner_input}))
+    
+    st.text_input("Kontraktor", key="cont_input", value=info['cont'], 
+                  on_change=lambda: st.session_state['project_info'].update({'cont': st.session_state.cont_input}))
+    
+    st.divider()
+    
+    st.number_input("Fee (%)", key="fee_input", value=info['fee_pct'], step=0.5,
+                    on_change=lambda: st.session_state['project_info'].update({'fee_pct': st.session_state.fee_input}))
+    
+    st.number_input("PPN (%)", key="tax_input", value=info['tax_pct'], step=1.0,
+                    on_change=lambda: st.session_state['project_info'].update({'tax_pct': st.session_state.tax_input}))
+    
+    if st.button("🔴 Reset Semua Data"):
+        st.session_state.clear()
+        st.rerun()
+
+# ==========================================
+# 5. MAIN INTERFACE
+# ==========================================
+st.title("🏗️ GEMS EngineX Estimator")
+st.caption(f"Project: {info['name']} | Owner: {info['owner']}")
+
+# Tabs
+t0, t1, t2 = st.tabs(["📊 Dashboard & Cover", "📝 Input RAB (Editor)", "📈 Analisa Data"])
+
+# --- TAB 0: COVER (Hasil Hitungan Real-Time) ---
+with t0:
+    st.markdown(f"""
+    <div style="background:white; padding:30px; border:4px double #1e3a8a; border-radius:10px; text-align:center;">
+        <h2 style="color:#1e3a8a; margin:0;">ENGINEERING ESTIMATE (EE)</h2>
+        <p style="color:#64748b;">{info['name']}</p>
+        <hr>
+        <h1 style="font-size:56px; color:#0f172a; margin:10px 0;">{engine.fmt_idr(summary['grand_total'])}</h1>
+        <p style="color:#64748b; font-style:italic;">(Termasuk Jasa {info['fee_pct']}% & PPN {info['tax_pct']}%)</p>
+        <br>
+        <div style="display:flex; justify-content:space-around; margin-top:20px;">
+            <div>Disetujui:<br><b>{info['owner']}</b></div>
+            <div>Dibuat:<br><b>{info['cont']}</b></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Biaya Konstruksi", engine.fmt_idr(summary['real_cost']))
+    col2.metric("Jasa + PPN", engine.fmt_idr(summary['fee_val'] + summary['tax_val']))
+    col3.metric("Grand Total", engine.fmt_idr(summary['grand_total']))
+
+# --- TAB 1: INPUT RAB (Sumber Masalah 'Muter' Dulu) ---
+with t1:
+    st.info("💡 **Petunjuk:** Ubah angka di tabel. Tekan Enter. Perhitungan otomatis update (Tanpa Loading Lama).")
+    
+    # KUNCI ANTI MUTER: 
+    # 1. Gunakan 'key' yang sama dengan yang kita init di backend ('rab_editor_data').
+    # 2. HAPUS st.rerun(). Streamlit editor otomatis handle update state via 'key'.
+    # 3. Kolom 'JumlahHarga' kita tampilkan dari hasil hitungan (df_calc), TAPI dinonaktifkan di editor
+    #    agar tidak disimpan balik ke input (karena itu hasil rumus).
+    
+    # Kita perlu merge 'JumlahHarga' dari df_calc ke editor data agar user bisa lihat total per item
+    # Tapi editor HANYA boleh mengubah Volume & HargaSatuan
+    
+    display_df = df_calc[["Divisi", "Uraian", "Satuan", "Volume", "HargaSatuan", "JumlahHarga"]]
+    
+    edited = st.data_editor(
+        display_df,
+        key="rab_editor_data", # <--- INI KUNCINYA. Streamlit langsung update session_state['rab_editor_data']
+        column_config={
+            "Divisi": st.column_config.SelectboxColumn(options=["I. PERSIAPAN", "II. TANAH", "III. LANTAI 1", "IV. LANTAI 2"], required=True),
+            "Uraian": st.column_config.TextColumn(width="large", required=True),
+            "Volume": st.column_config.NumberColumn(format="%.2f", required=True),
+            "HargaSatuan": st.column_config.NumberColumn(format="Rp %d", required=True),
+            "JumlahHarga": st.column_config.NumberColumn(format="Rp %d", disabled=True) # Read-only
+        },
+        num_rows="dynamic",
+        use_container_width=True
+    )
+    # TIDAK ADA KODE LOGIKA/RERUN DISINI. Biarkan Streamlit bekerja secara native.
+
+# --- TAB 2: ANALISA ---
+with t2:
+    st.subheader("Distribusi Biaya")
+    rekap = df_calc.groupby('Divisi')['JumlahHarga'].sum().reset_index()
+    rekap['Bobot (%)'] = (rekap['JumlahHarga'] / summary['real_cost'] * 100).fillna(0)
+    
+    st.dataframe(
+        rekap, 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={"JumlahHarga": st.column_config.NumberColumn(format="Rp %d"), "Bobot (%)": st.column_config.NumberColumn(format="%.2f %%")}
+    )
+    
+    st.bar_chart(rekap, x="Divisi", y="JumlahHarga", color="#1e3a8a")
+
+st.markdown("---")
+st.caption("Powered by GEMS EngineX | Zero-Loop Architecture")
